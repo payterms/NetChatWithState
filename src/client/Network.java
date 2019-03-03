@@ -11,10 +11,12 @@ import java.util.regex.Pattern;
 public class Network implements Closeable {
 
     private static final String AUTH_PATTERN = "/auth %s %s";
+    private static final String UPDATE_PATTERN = "/userupdate %s %s";
     private static final String MESSAGE_SEND_PATTERN = "/w %s %s";
     private static final String USER_LIST_PATTERN = "/userlist";
     private static final String USER_CONNECTED_PATTERN = "/userconn";
     private static final String USER_DISCONN_PATTERN = "/userdissconn";
+    private static final String USER_UPDATE_PATTERN = "/userupdate";
     private static final Pattern MESSAGE_PATTERN = Pattern.compile("^/w (\\w+) (.+)", Pattern.MULTILINE);
     private static final Pattern NOTIFY_PATTERN = Pattern.compile("^/(\\w+) ((\\w+(\\s|$))+)", Pattern.MULTILINE);
 
@@ -32,7 +34,6 @@ public class Network implements Closeable {
         this.hostName = hostName;
         this.port = port;
         this.messageSender = messageSender;
-
         this.receiver = createReceiverThread();
     }
 
@@ -71,9 +72,19 @@ public class Network implements Closeable {
                                         "Is offline now");
                                 messageSender.updateUserList(matcherNotify.group(2), updateUserListMode.DELETEUSER);
                                 messageSender.submitMessage(msg);
-
                             }
+
+                        } else if (text.startsWith(USER_UPDATE_PATTERN)) {
+                            if (matcherNotify.matches()) {
+                                String userList = matcherNotify.group(2);
+                                System.out.println("Modify User Rcv");
+                                messageSender.updateUserList(userList, updateUserListMode.UPDATEUSER);
+                            }
+
+                        }else if (text.equals("/upd successful")) {
+                            System.out.println("new name is accepted by server");
                         }
+
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -110,6 +121,28 @@ public class Network implements Closeable {
         } else {
             throw new AuthException();
         }
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public void updateUsername(String oldUsername, String newUserName) {
+        try {
+                out.writeUTF(String.format(UPDATE_PATTERN, oldUsername, newUserName));
+                out.flush();
+/*                String response = in.readUTF();
+                if (response.equals("/upd successful")) {
+                    System.out.println("new name " + newUserName + " is accepted by server");
+                    this.username = newUserName;
+                } else {
+                    throw new AuthException();
+                }*/
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
     }
 
     public String getUsername() {

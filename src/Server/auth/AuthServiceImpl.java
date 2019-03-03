@@ -9,14 +9,12 @@ import java.util.Map;
 public class AuthServiceImpl implements AuthService {
 
     public static final String DB_URL = "jdbc:sqlite:users.db";
-    // public static final String DB_URL = "jdbc:sqlite:s:/DEVELOP/Android/Lessons/NetChatWithState/db/users.db";
-
     public static final String DB_Driver = "org.sqlite.JDBC";
 
 
     public Map<String, Client> users = new HashMap<>();
 
-    public AuthServiceImpl() throws SQLException, ClassNotFoundException {
+    public AuthServiceImpl() {
 
         try {
             Class.forName(DB_Driver);

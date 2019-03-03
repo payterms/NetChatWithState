@@ -3,5 +3,6 @@ package client;
 public enum updateUserListMode {
     UPDATEALL,
     ADDUSER,
-    DELETEUSER
+    DELETEUSER,
+    UPDATEUSER
 }

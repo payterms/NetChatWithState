@@ -8,7 +8,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -17,18 +17,19 @@ public class ChatServer {
 
     private static final String USER_CONNECTED_PATTERN = "/userconn %s";
     private static final String USER_DISCONN_PATTERN = "/userdissconn %s";
+    private static final String USER_UPDATE_PATTERN = "/userupdate %s %s";
     private static final Pattern AUTH_PATTERN = Pattern.compile("^/auth (\\w+) (\\w+)$");
 
     private AuthService authService;
 
     private Map<String, ClientHandler> clientHandlerMap = Collections.synchronizedMap(new HashMap<>());
 
-    public ChatServer() throws SQLException, ClassNotFoundException {
+    public ChatServer() {
         this.authService = new AuthServiceImpl();
     }
 
 
-    public static void main(String[] args) throws SQLException, ClassNotFoundException {
+    public static void main(String[] args) {
         ChatServer chatServer = new ChatServer();
         chatServer.start(7777);
     }
@@ -53,7 +54,6 @@ public class ChatServer {
                             out.writeUTF("/auth successful");
                             out.flush();
                             broadcastUserConnected(username);
-
                             System.out.printf("Authorization for user %s successful%n", username);
                         } else {
                             System.out.printf("Authorization for user %s failed%n", username);
@@ -99,8 +99,8 @@ public class ChatServer {
         // сообщать о том, что конкретный пользователь подключился
         Iterator it = clientHandlerMap.entrySet().iterator();
         while (it.hasNext()) {
-            Map.Entry pair = (Map.Entry)it.next();
-            if(!pair.getKey().equals(username)){
+            Map.Entry pair = (Map.Entry) it.next();
+            if (!pair.getKey().equals(username)) {
                 ClientHandler userToClientHandler = clientHandlerMap.get(pair.getKey());
                 System.out.println("Send notify to " + pair.getKey());
                 try {
@@ -116,8 +116,8 @@ public class ChatServer {
         // сообщать о том, что конкретный пользователь отключился
         Iterator it = clientHandlerMap.entrySet().iterator();
         while (it.hasNext()) {
-            Map.Entry pair = (Map.Entry)it.next();
-            if(!pair.getKey().equals(username)){
+            Map.Entry pair = (Map.Entry) it.next();
+            if (!pair.getKey().equals(username)) {
                 ClientHandler userToClientHandler = clientHandlerMap.get(pair.getKey());
                 System.out.println("Send notify to " + pair.getKey());
                 try {
@@ -128,4 +128,61 @@ public class ChatServer {
             }
         }
     }
+
+    public void broadcastUserUpdate(String oldUsername, String newUsername) {
+        // сообщать о том, что конкретный пользователь изменил никнейм
+        Iterator it = clientHandlerMap.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry pair = (Map.Entry) it.next();
+            if (!pair.getKey().equals(oldUsername)) {
+                ClientHandler userToClientHandler = clientHandlerMap.get(pair.getKey());
+                System.out.println("Send notify to " + pair.getKey());
+                try {
+                    userToClientHandler.notifyUser(String.format(USER_UPDATE_PATTERN, oldUsername, newUsername));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+        }
+        // сохраняем хендлер соединения чтобы перезаписать с новым ником
+        ClientHandler userClientHandler = clientHandlerMap.get(oldUsername);
+        System.out.println("Changing nick for:" + oldUsername);
+        userClientHandler.setUsername(newUsername);
+        clientHandlerMap.put(newUsername, userClientHandler);// новый ник + хендлер
+        clientHandlerMap.remove(oldUsername);
+        System.out.println("User " + oldUsername + " removed from server");
+    }
+
+    public boolean updateUsername(String oldUsername, String newUsername) {
+        final String DB_URL = "jdbc:sqlite:users.db";
+        final String DB_Driver = "org.sqlite.JDBC";
+        int changesDone = 0;
+
+        try {
+            Class.forName(DB_Driver);
+            Connection connection = DriverManager.getConnection(DB_URL);
+            Statement statement = connection.createStatement();
+
+            changesDone = statement.executeUpdate("UPDATE Users SET NICK ='" + newUsername + "' WHERE " + "NICK ='" + oldUsername + "'");
+
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace(); // обработка ошибки  Class.forName
+            System.out.println("JDBC драйвер для СУБД не найден!");
+            return false;
+        } catch (SQLException e) {
+            e.printStackTrace(); // обработка ошибок  DriverManager.getConnection
+            System.out.println("Ошибка SQL !");
+            return false;
+        }
+        if (changesDone != 0) {
+            System.out.println("UPD OK");
+            return true;
+        } else {
+            return false;
+        }
+
+    }
+
+
 }

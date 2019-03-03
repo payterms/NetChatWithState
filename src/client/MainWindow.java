@@ -3,6 +3,7 @@ package client;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,6 +26,18 @@ public class MainWindow extends JFrame implements MessageSender {
         setTitle("Сетевой чат");
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         setBounds(200, 200, 500, 500);
+        JMenuBar mainMenu = new JMenuBar();
+        setJMenuBar(mainMenu);
+        JMenu fileMenu = new JMenu("Chat");
+        JMenu helpMenu = new JMenu("Help");
+        JMenuItem clearItem = new JMenuItem("Change nickname");
+        fileMenu.add(clearItem);
+        JMenuItem exitItem = new JMenuItem("Exit");
+        fileMenu.add(exitItem);
+        JMenuItem aboutItem = new JMenuItem("About");
+        helpMenu.add(aboutItem);
+        mainMenu.add(fileMenu);
+        mainMenu.add(helpMenu);
 
         setLayout(new BorderLayout());   // выбор компоновщика элементов
 
@@ -41,8 +54,6 @@ public class MainWindow extends JFrame implements MessageSender {
 
         userListModel = new DefaultListModel<>();
         userList = new JList<>(userListModel);
-        // добавить класс Model для userList по аналогии с messageListModel
-
         userList.setPreferredSize(new Dimension(100, 0));
         add(userList, BorderLayout.WEST);
 
@@ -102,8 +113,6 @@ public class MainWindow extends JFrame implements MessageSender {
             }
         });
 
-        // Подключение к shell всплывающего меню
-
         setVisible(true);
 
         network = new Network("localhost", 7777, this);
@@ -116,6 +125,11 @@ public class MainWindow extends JFrame implements MessageSender {
         }
 
         setTitle("Сетевой чат. Пользователь " + network.getUsername());
+        exitItem.addActionListener(new ExitActionListener());
+        aboutItem.addActionListener(new AboutActionListener());
+        clearItem.addActionListener(new ClearActionListener());
+
+        SwingUtilities.updateComponentTreeUI(mainMenu);
     }
 
     @Override
@@ -159,8 +173,72 @@ public class MainWindow extends JFrame implements MessageSender {
                         }
                     }
                     break;
+                    case UPDATEUSER: {
+                        //if (userListModel.contains(usrList)) {
+                            Pattern pattern = Pattern.compile("(\\w+)");
+                            Matcher matcher = pattern.matcher(usrList);
+                            int start = 0;
+                            while (matcher.find(start)) {
+                                String oldUsername = usrList.substring(matcher.start(), matcher.end());
+                                matcher.find(matcher.end());
+                                String newUsername = usrList.substring(matcher.start(), matcher.end());
+                                userListModel.remove(userListModel.indexOf(oldUsername));
+                                userListModel.add(userListModel.size(), newUsername);
+                                System.out.println("" + oldUsername + "-> " + newUsername);
+                                start = matcher.end();
+                            }
+                            userList.ensureIndexIsVisible(userListModel.size() - 1);
+                        //}
+                    }
+                    break;
                 }
             }
         });
+    }
+    private class ExitActionListener implements ActionListener {
+        public void actionPerformed(ActionEvent event) {
+            System.exit(0);
+        }
+    }
+
+
+    private class ClearActionListener implements ActionListener {
+        public void actionPerformed(ActionEvent event) {
+            String oldNickName = network.getUsername();
+            String newNickName;
+            newNickName = JOptionPane.showInputDialog(MainWindow.this, "New nickname", oldNickName , JOptionPane.INFORMATION_MESSAGE);
+            if (!newNickName.equals(oldNickName)){
+                // заправшиваем сервер на изменение
+                System.out.println("Query to server for new nickname: " + newNickName);
+                try {
+                    network.updateUsername(oldNickName,newNickName);
+                } catch (AuthException ex) {
+                    JOptionPane.showMessageDialog(MainWindow.this,
+                            "Ошибка смены имени!",
+                            "Авторизация",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                setTitle("Сетевой чат. Пользователь " + newNickName);
+                network.setUsername(newNickName);
+                if (userListModel.contains(oldNickName)) {
+                    userListModel.remove(userListModel.indexOf(oldNickName));
+                    userListModel.add(userListModel.size(), newNickName);
+                }
+
+
+            }
+            else {
+                JOptionPane.showMessageDialog(MainWindow.this, "Имя пользователя совпадает с текущим!", "Внимание!", JOptionPane.WARNING_MESSAGE);
+            }
+        }
+    }
+
+
+    private class AboutActionListener implements ActionListener {
+        public void actionPerformed(ActionEvent event) {
+            JOptionPane.showMessageDialog(MainWindow.this, "Сетевой чат вер. 1.0", "О программе", JOptionPane.INFORMATION_MESSAGE);
+
+        }
     }
 }
