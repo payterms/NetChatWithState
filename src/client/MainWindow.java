@@ -6,6 +6,8 @@ import java.awt.event.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static javafx.application.ConditionalFeature.SWT;
+
 public class MainWindow extends JFrame implements MessageSender {
 
     private JTextField textField;
@@ -100,6 +102,8 @@ public class MainWindow extends JFrame implements MessageSender {
             }
         });
 
+        // Подключение к shell всплывающего меню
+
         setVisible(true);
 
         network = new Network("localhost", 7777, this);
@@ -129,8 +133,8 @@ public class MainWindow extends JFrame implements MessageSender {
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
-                switch (mode){
-                    case UPDATEALL:{
+                switch (mode) {
+                    case UPDATEALL: {
                         Pattern pattern = Pattern.compile("(\\w+)");
                         Matcher matcher = pattern.matcher(usrList);
                         int start = 0;
@@ -143,14 +147,14 @@ public class MainWindow extends JFrame implements MessageSender {
                         userList.ensureIndexIsVisible(userListModel.size() - 1);
                     }
                     break;
-                    case ADDUSER:{
-                        if(!userListModel.contains(usrList)){
+                    case ADDUSER: {
+                        if (!userListModel.contains(usrList)) {
                             userListModel.add(userListModel.size(), usrList);
                         }
                     }
                     break;
-                    case DELETEUSER:{
-                        if(userListModel.contains(usrList)){
+                    case DELETEUSER: {
+                        if (userListModel.contains(usrList)) {
                             userListModel.remove(userListModel.indexOf(usrList));
                         }
                     }

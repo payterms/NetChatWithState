@@ -51,7 +51,7 @@ public class Network implements Closeable {
                                     matcher.group(2));
                             messageSender.submitMessage(msg);
                         } else if (text.startsWith(USER_LIST_PATTERN)) {
-                            // TODO обновить список подключенных пользователей
+                            // обновить список подключенных пользователей
                             if (matcherNotify.matches()) {
                                 String userList = matcherNotify.group(2);
                                 messageSender.updateUserList(userList, updateUserListMode.UPDATEALL);

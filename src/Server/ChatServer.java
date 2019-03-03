@@ -8,6 +8,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -18,11 +19,16 @@ public class ChatServer {
     private static final String USER_DISCONN_PATTERN = "/userdissconn %s";
     private static final Pattern AUTH_PATTERN = Pattern.compile("^/auth (\\w+) (\\w+)$");
 
-    private AuthService authService = new AuthServiceImpl();
+    private AuthService authService;
 
     private Map<String, ClientHandler> clientHandlerMap = Collections.synchronizedMap(new HashMap<>());
 
-    public static void main(String[] args) {
+    public ChatServer() throws SQLException, ClassNotFoundException {
+        this.authService = new AuthServiceImpl();
+    }
+
+
+    public static void main(String[] args) throws SQLException, ClassNotFoundException {
         ChatServer chatServer = new ChatServer();
         chatServer.start(7777);
     }
