@@ -1,6 +1,8 @@
 package client;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class Message {
 
@@ -10,13 +12,33 @@ public class Message {
 
     private String text;
 
-    private LocalDate date;
+    private LocalDateTime dateTime;
+
+    public Message() {
+        this.userFrom = "";
+        this.userTo = "";
+        this.text = "";
+        this.dateTime = LocalDateTime.now();
+    }
 
     public Message(String userFrom, String userTo, String text) {
         this.userFrom = userFrom;
         this.userTo = userTo;
         this.text = text;
-        this.date = LocalDate.now();
+        this.dateTime = LocalDateTime.now();
+    }
+
+    public Message(String userFrom, String userTo, String text, LocalDateTime dateTime) {
+        this.userFrom = userFrom;
+        this.userTo = userTo;
+        this.text = text;
+        this.dateTime = dateTime;
+    }
+
+    private static DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss");
+
+    public String getDateTime() {
+        return dateTime.format(dateFormat);
     }
 
     public String getUserFrom() {
@@ -32,6 +54,6 @@ public class Message {
     }
 
     public LocalDate getDate() {
-        return date;
+        return dateTime.toLocalDate();
     }
 }

@@ -1,9 +1,6 @@
 package client;
 
-import java.io.Closeable;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.Socket;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,6 +26,7 @@ public class Network implements Closeable {
     private String username;
     private final String hostName;
     private final int port;
+
 
     public Network(String hostName, int port, MessageSender messageSender) {
         this.hostName = hostName;
@@ -131,13 +129,6 @@ public class Network implements Closeable {
         try {
                 out.writeUTF(String.format(UPDATE_PATTERN, oldUsername, newUserName));
                 out.flush();
-/*                String response = in.readUTF();
-                if (response.equals("/upd successful")) {
-                    System.out.println("new name " + newUserName + " is accepted by server");
-                    this.username = newUserName;
-                } else {
-                    throw new AuthException();
-                }*/
         } catch (IOException e) {
             e.printStackTrace();
         }

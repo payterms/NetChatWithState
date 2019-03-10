@@ -26,7 +26,7 @@ public class MessageCellRenderer extends JPanel implements ListCellRenderer<Mess
         setBackground(list.getBackground());
         userName.setOpaque(true);
         userName.setText(value.getUserFrom());
-        message.setText(value.getText());
+        message.setText(String.format("[%s] %s", value.getDateTime(), value.getText()));
         return this;
     }
 }
