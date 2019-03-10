@@ -1,5 +1,7 @@
 package Server;
 
+import Server.auth.AuthServiceImpl;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -12,7 +14,9 @@ import java.util.regex.Pattern;
 public class ClientHandler {
 
     private static final Pattern MESSAGE_PATTERN = Pattern.compile("^/w (\\w+) (.+)", Pattern.MULTILINE);
+    private static final Pattern USER_UPDATE_PATTERN = Pattern.compile("^/userupdate (\\w+) (\\w+)$");
     private static final String USER_LIST_PATTERN = "/userlist";
+    private static final String UPDATE_PATTERN = "/userupdate";
     private static final String MESSAGE_SEND_PATTERN = "/w %s %s";
 
 
@@ -20,7 +24,7 @@ public class ClientHandler {
     private final DataInputStream inp;
     private final DataOutputStream out;
     private final ChatServer server;
-    private final String username;
+    private String username;
     private final Socket socket;
 
     public ClientHandler(String username, Socket socket, ChatServer server) throws IOException {
@@ -36,21 +40,37 @@ public class ClientHandler {
                 try {
                     while (!Thread.currentThread().isInterrupted()) {
                         String msg = inp.readUTF();
-                        System.out.printf("client.Message from user %s: %s%n", username, msg);
+                        System.out.printf("Message from user %s: %s%n", ClientHandler.this.username, msg);
 
                         Matcher matcher = MESSAGE_PATTERN.matcher(msg);
                         if (matcher.matches()) {
                             String userTo = matcher.group(1);
                             String message = matcher.group(2);
-                            server.sendMessage(userTo, username, message);
-                        }else if (msg.startsWith(USER_LIST_PATTERN)){
+                            server.sendMessage(userTo, ClientHandler.this.username, message);
+                        } else if (msg.startsWith(USER_LIST_PATTERN)) {
                             List<String> usrList = server.getUserList();
                             String msgToSend = USER_LIST_PATTERN;
-                            for (int i=0; i<usrList.size();i++ ) {
+                            for (int i = 0; i < usrList.size(); i++) {
                                 msgToSend += " " + usrList.get(i);
                             }
-                            System.out.printf("Sending user list to user %s: %s%n", username, msgToSend);
+                            System.out.printf("Sending user list to user %s: %s%n", ClientHandler.this.username, msgToSend);
                             out.writeUTF(msgToSend);
+                        } else if (msg.startsWith(UPDATE_PATTERN)) {
+                            matcher = USER_UPDATE_PATTERN.matcher(msg);
+                            if (matcher.matches()) {
+                                String oldUsername = matcher.group(1);
+                                String newUsername = matcher.group(2);
+                                if (server.updateUsername(oldUsername, newUsername)) {
+                                    out.writeUTF("/upd successful");
+                                    out.flush();
+                                    server.broadcastUserUpdate(oldUsername, newUsername);
+                                    ClientHandler.this.setUsername(newUsername);
+
+                                }else{
+                                    out.writeUTF("/upd failed");
+                                    out.flush();
+                                }
+                            }
                         }
                     }
                 } catch (IOException e) {
@@ -79,5 +99,9 @@ public class ClientHandler {
 
     public String getUsername() {
         return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 }
