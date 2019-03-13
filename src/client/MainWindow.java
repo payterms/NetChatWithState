@@ -19,6 +19,8 @@ public class MainWindow extends JFrame implements MessageSender {
     private JList<String> userList;
     private DefaultListModel<String> userListModel;
     private JPanel panel;
+    private ChatLogger logger;
+    private final static int MSG_BUFFER_SIZE = 100;
 
     private Network network;
 
@@ -82,6 +84,7 @@ public class MainWindow extends JFrame implements MessageSender {
 
                 Message msg = new Message(network.getUsername(), userTo, text.trim());
                 submitMessage(msg);
+
                 textField.setText(null);
                 textField.requestFocus();
 
@@ -125,6 +128,24 @@ public class MainWindow extends JFrame implements MessageSender {
         }
 
         setTitle("Сетевой чат. Пользователь " + network.getUsername());
+        Message[] msgList = new Message[MSG_BUFFER_SIZE];
+        try {
+            // создаем логгер
+            logger = new ChatLogger("history_["+ network.getUsername() + "].txt");
+            // восстанавливаем последние сообщения
+            for (int i = 0; i < MSG_BUFFER_SIZE ; i++) {
+                msgList[MSG_BUFFER_SIZE-i-1] = logger.restoreMsgFromLog();
+                if(msgList[MSG_BUFFER_SIZE-i-1] == null) break;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        // Забрасываем подошедшие восстановленные сообщения в список для отображения
+        for (int i = 0; i < MSG_BUFFER_SIZE ; i++) {
+            if(msgList[i] != null){
+                messageListModel.add(messageListModel.size(), msgList[i]);
+            }
+        }
         exitItem.addActionListener(new ExitActionListener());
         aboutItem.addActionListener(new AboutActionListener());
         clearItem.addActionListener(new ClearActionListener());
@@ -138,6 +159,11 @@ public class MainWindow extends JFrame implements MessageSender {
             @Override
             public void run() {
                 messageListModel.add(messageListModel.size(), msg);
+                try {
+                    logger.logWriteMsg(msg);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
                 messageList.ensureIndexIsVisible(messageListModel.size() - 1);
             }
         });
@@ -154,7 +180,11 @@ public class MainWindow extends JFrame implements MessageSender {
                         int start = 0;
                         while (matcher.find(start)) {
                             String value = usrList.substring(matcher.start(), matcher.end());
-                            userListModel.add(userListModel.size(), value);
+                            if(network.getUsername().equals(value)){
+                                userListModel.add(userListModel.size(), value);
+                            }else{
+                                userListModel.add(userListModel.size(), value);
+                            }
                             System.out.println(value);
                             start = matcher.end();
                         }
@@ -221,6 +251,13 @@ public class MainWindow extends JFrame implements MessageSender {
                 }
                 setTitle("Сетевой чат. Пользователь " + newNickName);
                 network.setUsername(newNickName);
+                try {
+                    ChatLogger.logClose();// закрываем старый лог
+                    logger = new ChatLogger("history_["+ network.getUsername() + "].txt");// открываем лог с новым ником
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
                 if (userListModel.contains(oldNickName)) {
                     userListModel.remove(userListModel.indexOf(oldNickName));
                     userListModel.add(userListModel.size(), newNickName);
