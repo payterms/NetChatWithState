@@ -10,6 +10,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -19,13 +22,17 @@ public class ChatServer {
     private static final String USER_DISCONN_PATTERN = "/userdissconn %s";
     private static final String USER_UPDATE_PATTERN = "/userupdate %s %s";
     private static final Pattern AUTH_PATTERN = Pattern.compile("^/auth (\\w+) (\\w+)$");
+    private static final int MAX_THREADS_COUNT = 2; // маскимальное количество одновременных соединений с сервером
+
 
     private AuthService authService;
+    ExecutorService executor; //сервис исполнения
 
     private Map<String, ClientHandler> clientHandlerMap = Collections.synchronizedMap(new HashMap<>());
 
     public ChatServer() {
         this.authService = new AuthServiceImpl();
+        executor = Executors.newCachedThreadPool();
     }
 
 
@@ -39,40 +46,49 @@ public class ChatServer {
             System.out.println("Server started!");
             while (true) {
                 Socket socket = serverSocket.accept();
-                DataInputStream inp = new DataInputStream(socket.getInputStream());
-                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                System.out.println("New client connected!");
+                if (clientHandlerMap.size() < MAX_THREADS_COUNT) {
+                    DataInputStream inp = new DataInputStream(socket.getInputStream());
+                    DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                    System.out.println("New client connected!");
 
-                try {
-                    String authMessage = inp.readUTF();
-                    Matcher matcher = AUTH_PATTERN.matcher(authMessage);
-                    if (matcher.matches()) {
-                        String username = matcher.group(1);
-                        String password = matcher.group(2);
-                        if (authService.authUser(username, password)) {
-                            clientHandlerMap.put(username, new ClientHandler(username, socket, this));
-                            out.writeUTF("/auth successful");
-                            out.flush();
-                            broadcastUserConnected(username);
-                            System.out.printf("Authorization for user %s successful%n", username);
+                    try {
+                        String authMessage = inp.readUTF();
+                        Matcher matcher = AUTH_PATTERN.matcher(authMessage);
+                        if (matcher.matches()) {
+                            String username = matcher.group(1);
+                            String password = matcher.group(2);
+                            if (authService.authUser(username, password)) {
+                                ClientHandler currentClient = new ClientHandler(username, socket, this);// создаем нить для работы с авторизованным клиентом
+                                executor.execute(currentClient); // помещаем в пул
+                                clientHandlerMap.put(username, currentClient); // записываем в мапу хендлер
+                                out.writeUTF("/auth successful");
+                                out.flush();
+                                broadcastUserConnected(username);
+                                System.out.printf("Authorization for user %s successful%n", username);
+                            } else {
+                                System.out.printf("Authorization for user %s failed%n", username);
+                                out.writeUTF("/auth fails");
+                                out.flush();
+                                socket.close();
+                            }
                         } else {
-                            System.out.printf("Authorization for user %s failed%n", username);
+                            System.out.printf("Incorrect authorization message %s%n", authMessage);
                             out.writeUTF("/auth fails");
                             out.flush();
                             socket.close();
                         }
-                    } else {
-                        System.out.printf("Incorrect authorization message %s%n", authMessage);
-                        out.writeUTF("/auth fails");
-                        out.flush();
-                        socket.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
-                } catch (IOException e) {
-                    e.printStackTrace();
+                } else {
+                    System.out.println("Max connections count is reached! Try another time.");
+                    socket.close();
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            executor.shutdown();
         }
     }
 
