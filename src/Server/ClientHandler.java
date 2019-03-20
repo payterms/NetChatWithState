@@ -1,5 +1,8 @@
 package Server;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -9,13 +12,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
-public class ClientHandler implements Runnable{
+public class ClientHandler implements Runnable {
 
     private static final Pattern MESSAGE_PATTERN = Pattern.compile("^/w (\\w+) (.+)", Pattern.MULTILINE);
     private static final Pattern USER_UPDATE_PATTERN = Pattern.compile("^/userupdate (\\w+) (\\w+)$");
     private static final String USER_LIST_PATTERN = "/userlist";
     private static final String UPDATE_PATTERN = "/userupdate";
     private static final String MESSAGE_SEND_PATTERN = "/w %s %s";
+    private static final Logger LOGGER = LogManager.getLogger(ClientHandler.class);
 
 
     private final Thread handleThread;
@@ -32,7 +36,6 @@ public class ClientHandler implements Runnable{
         this.inp = new DataInputStream(socket.getInputStream());
         this.out = new DataOutputStream(socket.getOutputStream());
         this.handleThread = new Thread(this);
-
         handleThread.start();
     }
 
@@ -41,7 +44,7 @@ public class ClientHandler implements Runnable{
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 String msg = inp.readUTF();
-                System.out.printf("Message from user %s: %s%n", ClientHandler.this.username, msg);
+                LOGGER.info(String.format("Message from user %s: %s%n", ClientHandler.this.username, msg));
 
                 Matcher matcher = MESSAGE_PATTERN.matcher(msg);
                 if (matcher.matches()) {
@@ -54,7 +57,7 @@ public class ClientHandler implements Runnable{
                     for (int i = 0; i < usrList.size(); i++) {
                         msgToSend += " " + usrList.get(i);
                     }
-                    System.out.printf("Sending user list to user %s: %s%n", ClientHandler.this.username, msgToSend);
+                    LOGGER.info(String.format("Sending user list to user %s: %s%n", ClientHandler.this.username, msgToSend));
                     out.writeUTF(msgToSend);
                 } else if (msg.startsWith(UPDATE_PATTERN)) {
                     matcher = USER_UPDATE_PATTERN.matcher(msg);
@@ -67,7 +70,7 @@ public class ClientHandler implements Runnable{
                             server.broadcastUserUpdate(oldUsername, newUsername);
                             ClientHandler.this.setUsername(newUsername);
 
-                        }else{
+                        } else {
                             out.writeUTF("/upd failed");
                             out.flush();
                         }
@@ -77,10 +80,12 @@ public class ClientHandler implements Runnable{
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-            System.out.printf("Client %s disconnected%n", username);
+            LOGGER.info(String.format("Client %s disconnected", username));
             try {
+                LOGGER.info("Socket is closing ...");
                 socket.close();
             } catch (IOException e) {
+                LOGGER.error("Socket is closing ...", e);
                 e.printStackTrace();
             }
             server.unsubscribeClient(ClientHandler.this);

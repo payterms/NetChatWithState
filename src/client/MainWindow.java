@@ -262,8 +262,6 @@ public class MainWindow extends JFrame implements MessageSender {
                     userListModel.remove(userListModel.indexOf(oldNickName));
                     userListModel.add(userListModel.size(), newNickName);
                 }
-
-
             }
             else {
                 JOptionPane.showMessageDialog(MainWindow.this, "Имя пользователя совпадает с текущим!", "Внимание!", JOptionPane.WARNING_MESSAGE);
