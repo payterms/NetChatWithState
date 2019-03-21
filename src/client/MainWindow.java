@@ -1,5 +1,8 @@
 package client;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -21,6 +24,7 @@ public class MainWindow extends JFrame implements MessageSender {
     private JPanel panel;
     private ChatLogger logger;
     private final static int MSG_BUFFER_SIZE = 100;
+    private static final Logger LOGGER = LogManager.getLogger(MainWindow.class);
 
     private Network network;
 
@@ -124,6 +128,7 @@ public class MainWindow extends JFrame implements MessageSender {
         loginDialog.setVisible(true);
 
         if (!loginDialog.isConnected()) {
+            LOGGER.info("Exiting");
             System.exit(0);
         }
 
@@ -185,7 +190,7 @@ public class MainWindow extends JFrame implements MessageSender {
                             }else{
                                 userListModel.add(userListModel.size(), value);
                             }
-                            System.out.println(value);
+                            LOGGER.info(value);
                             start = matcher.end();
                         }
                         userList.ensureIndexIsVisible(userListModel.size() - 1);
@@ -214,7 +219,7 @@ public class MainWindow extends JFrame implements MessageSender {
                                 String newUsername = usrList.substring(matcher.start(), matcher.end());
                                 userListModel.remove(userListModel.indexOf(oldUsername));
                                 userListModel.add(userListModel.size(), newUsername);
-                                System.out.println("" + oldUsername + "-> " + newUsername);
+                                LOGGER.info("" + oldUsername + "-> " + newUsername);
                                 start = matcher.end();
                             }
                             userList.ensureIndexIsVisible(userListModel.size() - 1);
@@ -239,7 +244,7 @@ public class MainWindow extends JFrame implements MessageSender {
             newNickName = JOptionPane.showInputDialog(MainWindow.this, "New nickname", oldNickName , JOptionPane.INFORMATION_MESSAGE);
             if (!newNickName.equals(oldNickName)){
                 // заправшиваем сервер на изменение
-                System.out.println("Query to server for new nickname: " + newNickName);
+                LOGGER.info("Query to server for new nickname: " + newNickName);
                 try {
                     network.updateUsername(oldNickName,newNickName);
                 } catch (AuthException ex) {

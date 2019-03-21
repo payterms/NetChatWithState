@@ -27,7 +27,6 @@ public class ChatServer {
     private static final int MAX_THREADS_COUNT = 100; // маскимальное количество одновременных соединений с сервером
     private static final Logger LOGGER = LogManager.getLogger(ChatServer.class);
 
-
     private AuthService authService;
     ExecutorService executor; //сервис исполнения
 
@@ -35,9 +34,11 @@ public class ChatServer {
 
     public ChatServer() {
         this.authService = new AuthServiceImpl();
-        executor = Executors.newCachedThreadPool();
     }
 
+    public ExecutorService getExecutor() {
+        return executor;
+    }
 
     public static void main(String[] args) {
         ChatServer chatServer = new ChatServer();
@@ -47,6 +48,7 @@ public class ChatServer {
     public void start(int port) {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             LOGGER.info("Server started!");
+            executor = Executors.newCachedThreadPool();
             while (true) {
                 Socket socket = serverSocket.accept();
                 if (clientHandlerMap.size() < MAX_THREADS_COUNT) {
@@ -62,14 +64,13 @@ public class ChatServer {
                             String password = matcher.group(2);
                             if (authService.authUser(username, password)) {
                                 ClientHandler currentClient = new ClientHandler(username, socket, this);// создаем нить для работы с авторизованным клиентом
-                                executor.execute(currentClient); // помещаем в пул
                                 clientHandlerMap.put(username, currentClient); // записываем в мапу хендлер
                                 out.writeUTF("/auth successful");
                                 out.flush();
                                 broadcastUserConnected(username);
-                                LOGGER.info(String.format("Authorization for user %s successful", username));
+                                LOGGER.info(String.format("Authorization for user [%s] successful", username));
                             } else {
-                                LOGGER.info(String.format("Authorization for user %s failed", username));
+                                LOGGER.info(String.format("Authorization for user [%s] failed", username));
                                 out.writeUTF("/auth fails");
                                 out.flush();
                                 socket.close();

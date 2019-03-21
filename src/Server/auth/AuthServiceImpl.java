@@ -16,14 +16,14 @@ public class AuthServiceImpl implements AuthService {
     public static final String DB_Driver = "org.sqlite.JDBC";
     private static final Logger LOGGER = LogManager.getLogger(AuthServiceImpl.class);
 
-
+    private static Connection connection;
     public Map<String, Client> users = new HashMap<>();
 
     public AuthServiceImpl() {
 
         try {
             Class.forName(DB_Driver);
-            Connection connection = DriverManager.getConnection(DB_URL);
+            connection = DriverManager.getConnection(DB_URL);
 
             Statement statement = connection.createStatement();
 
@@ -76,6 +76,8 @@ public class AuthServiceImpl implements AuthService {
         String pwd = users.get(username).getPassword();
         return pwd != null && pwd.equals(password);
     }
-
-
+    @Override
+    public void close() throws SQLException {
+        connection.close();
+    }
 }
