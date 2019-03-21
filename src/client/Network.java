@@ -1,5 +1,9 @@
 package client;
 
+import Server.ChatServer;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.*;
 import java.net.Socket;
 import java.util.regex.Matcher;
@@ -16,6 +20,7 @@ public class Network implements Closeable {
     private static final String USER_UPDATE_PATTERN = "/userupdate";
     private static final Pattern MESSAGE_PATTERN = Pattern.compile("^/w (\\w+) (.+)", Pattern.MULTILINE);
     private static final Pattern NOTIFY_PATTERN = Pattern.compile("^/(\\w+) ((\\w+(\\s|$))+)", Pattern.MULTILINE);
+    private static final Logger LOGGER = LogManager.getLogger(Network.class);
 
     private Socket socket;
     private DataOutputStream out;
@@ -42,7 +47,7 @@ public class Network implements Closeable {
                 while (!Thread.currentThread().isInterrupted()) {
                     try {
                         String text = in.readUTF();
-                        System.out.println("New message " + text);
+                        LOGGER.info("New message " + text);
                         Matcher matcher = MESSAGE_PATTERN.matcher(text);
                         Matcher matcherNotify = NOTIFY_PATTERN.matcher(text);
                         if (matcher.matches()) {
@@ -75,19 +80,19 @@ public class Network implements Closeable {
                         } else if (text.startsWith(USER_UPDATE_PATTERN)) {
                             if (matcherNotify.matches()) {
                                 String userList = matcherNotify.group(2);
-                                System.out.println("Modify User Rcv");
+                                LOGGER.info("Modify User Rcv");
                                 messageSender.updateUserList(userList, updateUserListMode.UPDATEUSER);
                             }
 
-                        }else if (text.equals("/upd successful")) {
-                            System.out.println("new name is accepted by server");
+                        } else if (text.equals("/upd successful")) {
+                            LOGGER.info("new name is accepted by server");
                         }
 
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                 }
-                System.out.printf("client.Network connection is closed for user %s%n", username);
+                LOGGER.info(String.format("client.Network connection is closed for user %s", username));
             }
         });
     }
@@ -98,9 +103,12 @@ public class Network implements Closeable {
 
     private void sendMessage(String msg) {
         try {
+            LOGGER.debug("Try to Send Message " + msg);
             out.writeUTF(msg);
             out.flush();
+            LOGGER.debug("Message is sent");
         } catch (IOException e) {
+            LOGGER.error("Send Message Err", e);
             e.printStackTrace();
         }
     }
@@ -113,6 +121,7 @@ public class Network implements Closeable {
         out.writeUTF(String.format(AUTH_PATTERN, username, password));
         String response = in.readUTF();
         if (response.equals("/auth successful")) {
+            LOGGER.info("Client auth successful");
             this.username = username;
             receiver.start();
             sendMessage(USER_LIST_PATTERN);
@@ -127,8 +136,9 @@ public class Network implements Closeable {
 
     public void updateUsername(String oldUsername, String newUserName) {
         try {
-                out.writeUTF(String.format(UPDATE_PATTERN, oldUsername, newUserName));
-                out.flush();
+            LOGGER.info("Client is trying to change nickname to " + newUserName);
+            out.writeUTF(String.format(UPDATE_PATTERN, oldUsername, newUserName));
+            out.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -143,10 +153,12 @@ public class Network implements Closeable {
     @Override
     public void close() {
         try {
+            LOGGER.info("Closing socket");
             socket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
+        LOGGER.info("Chat receiver interrupt");
         receiver.interrupt();
         try {
             receiver.join();

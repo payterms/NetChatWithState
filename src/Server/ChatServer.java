@@ -2,6 +2,8 @@ package Server;
 
 import Server.auth.AuthService;
 import Server.auth.AuthServiceImpl;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -22,8 +24,8 @@ public class ChatServer {
     private static final String USER_DISCONN_PATTERN = "/userdissconn %s";
     private static final String USER_UPDATE_PATTERN = "/userupdate %s %s";
     private static final Pattern AUTH_PATTERN = Pattern.compile("^/auth (\\w+) (\\w+)$");
-    private static final int MAX_THREADS_COUNT = 2; // маскимальное количество одновременных соединений с сервером
-
+    private static final int MAX_THREADS_COUNT = 100; // маскимальное количество одновременных соединений с сервером
+    private static final Logger LOGGER = LogManager.getLogger(ChatServer.class);
 
     private AuthService authService;
     ExecutorService executor; //сервис исполнения
@@ -32,9 +34,11 @@ public class ChatServer {
 
     public ChatServer() {
         this.authService = new AuthServiceImpl();
-        executor = Executors.newCachedThreadPool();
     }
 
+    public ExecutorService getExecutor() {
+        return executor;
+    }
 
     public static void main(String[] args) {
         ChatServer chatServer = new ChatServer();
@@ -43,13 +47,14 @@ public class ChatServer {
 
     public void start(int port) {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Server started!");
+            LOGGER.info("Server started!");
+            executor = Executors.newCachedThreadPool();
             while (true) {
                 Socket socket = serverSocket.accept();
                 if (clientHandlerMap.size() < MAX_THREADS_COUNT) {
                     DataInputStream inp = new DataInputStream(socket.getInputStream());
                     DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                    System.out.println("New client connected!");
+                    LOGGER.info("New client connected!");
 
                     try {
                         String authMessage = inp.readUTF();
@@ -59,20 +64,19 @@ public class ChatServer {
                             String password = matcher.group(2);
                             if (authService.authUser(username, password)) {
                                 ClientHandler currentClient = new ClientHandler(username, socket, this);// создаем нить для работы с авторизованным клиентом
-                                executor.execute(currentClient); // помещаем в пул
                                 clientHandlerMap.put(username, currentClient); // записываем в мапу хендлер
                                 out.writeUTF("/auth successful");
                                 out.flush();
                                 broadcastUserConnected(username);
-                                System.out.printf("Authorization for user %s successful%n", username);
+                                LOGGER.info(String.format("Authorization for user [%s] successful", username));
                             } else {
-                                System.out.printf("Authorization for user %s failed%n", username);
+                                LOGGER.info(String.format("Authorization for user [%s] failed", username));
                                 out.writeUTF("/auth fails");
                                 out.flush();
                                 socket.close();
                             }
                         } else {
-                            System.out.printf("Incorrect authorization message %s%n", authMessage);
+                            LOGGER.info(String.format("Incorrect authorization message %s", authMessage));
                             out.writeUTF("/auth fails");
                             out.flush();
                             socket.close();
@@ -81,7 +85,7 @@ public class ChatServer {
                         e.printStackTrace();
                     }
                 } else {
-                    System.out.println("Max connections count is reached! Try another time.");
+                    LOGGER.info("Max connections count is reached! Try another time.");
                     socket.close();
                 }
             }
@@ -97,7 +101,7 @@ public class ChatServer {
         if (userToClientHandler != null) {
             userToClientHandler.sendMessage(userFrom, msg);
         } else {
-            System.out.printf("User %s not found. client.Message from %s is lost.%n", userTo, userFrom);
+            LOGGER.info(String.format("User %s not found. client.Message from %s is lost.", userTo, userFrom));
         }
     }
 
@@ -118,7 +122,7 @@ public class ChatServer {
             Map.Entry pair = (Map.Entry) it.next();
             if (!pair.getKey().equals(username)) {
                 ClientHandler userToClientHandler = clientHandlerMap.get(pair.getKey());
-                System.out.println("Send notify to " + pair.getKey());
+                LOGGER.info("Send notify to " + pair.getKey());
                 try {
                     userToClientHandler.notifyUser(String.format(USER_CONNECTED_PATTERN, username));
                 } catch (IOException e) {
@@ -135,7 +139,7 @@ public class ChatServer {
             Map.Entry pair = (Map.Entry) it.next();
             if (!pair.getKey().equals(username)) {
                 ClientHandler userToClientHandler = clientHandlerMap.get(pair.getKey());
-                System.out.println("Send notify to " + pair.getKey());
+                LOGGER.info("Send notify to " + pair.getKey());
                 try {
                     userToClientHandler.notifyUser(String.format(USER_DISCONN_PATTERN, username));
                 } catch (IOException e) {
@@ -152,7 +156,7 @@ public class ChatServer {
             Map.Entry pair = (Map.Entry) it.next();
             if (!pair.getKey().equals(oldUsername)) {
                 ClientHandler userToClientHandler = clientHandlerMap.get(pair.getKey());
-                System.out.println("Send notify to " + pair.getKey());
+                LOGGER.info("Send notify to " + pair.getKey());
                 try {
                     userToClientHandler.notifyUser(String.format(USER_UPDATE_PATTERN, oldUsername, newUsername));
                 } catch (IOException e) {
@@ -163,11 +167,11 @@ public class ChatServer {
         }
         // сохраняем хендлер соединения чтобы перезаписать с новым ником
         ClientHandler userClientHandler = clientHandlerMap.get(oldUsername);
-        System.out.println("Changing nick for:" + oldUsername);
+        LOGGER.info("Changing nick for:" + oldUsername);
         userClientHandler.setUsername(newUsername);
         clientHandlerMap.put(newUsername, userClientHandler);// новый ник + хендлер
         clientHandlerMap.remove(oldUsername);
-        System.out.println("User " + oldUsername + " removed from server");
+        LOGGER.info("User " + oldUsername + " removed from server");
     }
 
     public boolean updateUsername(String oldUsername, String newUsername) {
@@ -184,15 +188,15 @@ public class ChatServer {
 
         } catch (ClassNotFoundException e) {
             e.printStackTrace(); // обработка ошибки  Class.forName
-            System.out.println("JDBC драйвер для СУБД не найден!");
+            LOGGER.error("JDBC драйвер для СУБД не найден!");
             return false;
         } catch (SQLException e) {
             e.printStackTrace(); // обработка ошибок  DriverManager.getConnection
-            System.out.println("Ошибка SQL !");
+            LOGGER.error("Ошибка SQL !");
             return false;
         }
         if (changesDone != 0) {
-            System.out.println("UPD OK");
+            LOGGER.info("UPD OK");
             return true;
         } else {
             return false;

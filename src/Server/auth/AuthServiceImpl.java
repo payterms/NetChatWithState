@@ -1,5 +1,9 @@
 package Server.auth;
 
+import Server.ClientHandler;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.sql.*;
 import java.time.LocalDate;
 import java.util.Collection;
@@ -10,28 +14,29 @@ public class AuthServiceImpl implements AuthService {
 
     public static final String DB_URL = "jdbc:sqlite:users.db";
     public static final String DB_Driver = "org.sqlite.JDBC";
+    private static final Logger LOGGER = LogManager.getLogger(AuthServiceImpl.class);
 
-
+    private static Connection connection;
     public Map<String, Client> users = new HashMap<>();
 
     public AuthServiceImpl() {
 
         try {
             Class.forName(DB_Driver);
-            Connection connection = DriverManager.getConnection(DB_URL);
+            connection = DriverManager.getConnection(DB_URL);
 
             Statement statement = connection.createStatement();
 
             for (Client client : readAllClients(statement)) {
                 users.put(client.getUsername(), client);
-                System.out.println(client);
+                LOGGER.info(client);
             }
         } catch (ClassNotFoundException e) {
             e.printStackTrace(); // обработка ошибки  Class.forName
-            System.out.println("JDBC драйвер для СУБД не найден!");
+            LOGGER.error("JDBC драйвер для СУБД не найден!", e);
         } catch (SQLException e) {
             e.printStackTrace(); // обработка ошибок  DriverManager.getConnection
-            System.out.println("Ошибка SQL !");
+            LOGGER.error("Ошибка SQL !", e);
         }
     }
 
@@ -45,7 +50,6 @@ public class AuthServiceImpl implements AuthService {
                 clientById.put(id, createClient(resultSet, id));
             }
         }
-
         return clientById.values();
 
     }
@@ -72,6 +76,8 @@ public class AuthServiceImpl implements AuthService {
         String pwd = users.get(username).getPassword();
         return pwd != null && pwd.equals(password);
     }
-
-
+    @Override
+    public void close() throws SQLException {
+        connection.close();
+    }
 }
